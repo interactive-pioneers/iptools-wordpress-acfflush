@@ -1,26 +1,30 @@
 <?php
+/**
+ * Plugin Name: IPToolsACFFlush
+ * Plugin URI: https://github.com/interactive-pioneers/iptools-wordpress-acfflush
+ * Description: Flush obsolete postmeta data for Wordpress plugin ACF on save posts.
+ * Author: Interactive Pioneers GmbH
+ * Author URI: https://www.interactive-pioneers.de
+ * Author Email: gm@interactive-pioneers.de
+ * Version: 0.0.1
+ * Text Domain: acf-flush
+ */
 
-class ChioAcfFlush {
+if(!defined('WPINC')) die;
 
-  private $chioAcfFields = array('inhalte');
+class IPToolsAcfFlush {
 
   private $fieldKeys = array();
 
   public function __construct() {
-    add_action('acf/save_post', array($this, 'flush', 1));
+    add_action('acf/save_post', array($this, 'flush'), 1);
   }
 
   public function flush($postId) {
     $dbFieldKeys = $this->getDBFieldKeys($postId);
     $dbFieldValues = $this->getDBFieldValues($postId, $dbFieldKeys);
 
-    $all = array();
-    foreach($dbFieldKeys as $item) {
-      $all[] = $item['meta_key'];
-    }
-    foreach($dbFieldValues as $item) {
-      $all[] = $item['meta_key'];
-    }
+    $all = array_merge($dbFieldKeys, $dbFieldValues);
 
     $this->flushFields($postId, $all);
 
@@ -44,10 +48,9 @@ class ChioAcfFlush {
     $this->getAcfFieldKeys($postId);
     $sList = "'" . implode("','", $this->fieldKeys) . "'";
 
-    return $wpdb->get_results('
+    $results = $wpdb->get_results('
       SELECT
-        *
-        #meta_key
+        meta_key
       FROM
         wp_postmeta
       WHERE
@@ -55,6 +58,10 @@ class ChioAcfFlush {
         AND meta_key LIKE "_%"
         AND meta_value IN (' . $sList . ')
     ', ARRAY_A);
+
+    $flattenResults = array_map(array($this, 'flattenResult'), $results);
+
+    return $flattenResults;
   }
 
   private function getDBFieldValues($postId, $dbFieldKeys) {
@@ -62,20 +69,23 @@ class ChioAcfFlush {
 
     $aList = array();
     foreach($dbFieldKeys as $item) {
-      $aList[] = substr($item['meta_key'], 1);
+      $aList[] = substr($item, 1);
     }
     $sList = "'" . implode("','", $aList) . "'";
 
-    return $wpdb->get_results('
+    $results = $wpdb->get_results('
       SELECT
-        *
-        #meta_key
+        meta_key
       FROM
         wp_postmeta
       WHERE
         post_id = ' . $postId . '
         AND meta_key IN (' . $sList . ')
     ', ARRAY_A);
+
+    $flattenResults = array_map(array($this, 'flattenResult'), $results);
+
+    return $flattenResults;
   }
 
   private function flushFields($postId, $fields) {
@@ -91,6 +101,10 @@ class ChioAcfFlush {
         AND meta_key IN (' . $sList . ')
     ', ARRAY_A);
   }
+
+  private function flattenResult($item) {
+    return $item['meta_key'];
+  }
 }
 
-$oChioAcfFlush = new ChioAcfFlush();
+$oIPToolsAcfFlush = new IPToolsAcfFlush();
